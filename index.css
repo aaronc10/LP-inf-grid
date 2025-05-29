@@ -1,0 +1,528 @@
+:root {
+  --lp-bg-color: #f8f5f0; /* Light, luxurious beige */
+  --lp-text-color: #333333;
+  --lp-primary-accent: #8a6c52; /* Muted, sophisticated brown */
+  --lp-secondary-accent: #c0b2a3; /* Lighter accent */
+  --lp-border-color: #dcdcdc;
+  --lp-grid-bg: #edeae6; 
+  
+  /* Tag Filter Specific Colors */
+  --tag-filter-border-color: #C8B8AA; 
+  --tag-filter-bg-color: rgba(250, 247, 243, 0.9); 
+  --tag-filter-text-color: #333333; 
+  --tag-filter-icon-color: #333333;
+  --tag-filter-hover-bg-color: #eae1d9; 
+  --tag-filter-dropdown-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --tag-filter-serif-font: "Optima LT Std", "Georgia", "Times New Roman", Times, serif; 
+  --tag-filter-pinned-color: var(--lp-primary-accent);
+
+  /* Floating UI */
+  --floating-text-color: #2c2c2c; /* Darker for better readability */
+  --floating-sub-text-color: #5a5a5a; /* For price/secondary details */
+  --floating-bg-blur: 8px;
+  --floating-z-index: 200;
+
+  /* Focused Product Details Pane */
+  --focused-pane-text-main: #3a3a3a;
+  --focused-pane-text-sub: #707070;
+  --focused-pane-button-bg: var(--lp-primary-accent);
+  --focused-pane-button-text: white;
+  --focused-pane-tag-border: var(--tag-filter-border-color);
+  --focused-pane-tag-text: var(--tag-filter-text-color);
+  --focused-pane-tag-hover-bg: var(--tag-filter-hover-bg-color);
+}
+
+@font-face {
+  font-family: 'Optima LT Std';
+  src: url('/fonts/OptimaLTStd.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Times Now SemiLight';
+  src: url('/fonts/TimesNow-SemiLight.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden; 
+}
+
+body {
+  font-family: "Google Sans Display", "Helvetica Neue", Arial, sans-serif; 
+  background-color: var(--lp-bg-color);
+  color: var(--lp-text-color);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  display: flex; 
+  justify-content: center;
+  align-items: center;
+}
+
+.app-container.product-explorer.full-canvas {
+  width: 100%;
+  height: 100%;
+  display: flex; 
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--lp-bg-color);
+}
+
+.loading-placeholder {
+  font-size: 1.2em;
+  color: var(--lp-primary-accent);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+  text-align: center;
+}
+
+/* Image Grid Styles */
+.image-grid-viewport {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden; 
+  background-color: var(--lp-grid-bg);
+  cursor: grab; 
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+  perspective: 1200px; 
+  transform-style: preserve-3d; 
+  z-index: 1;
+}
+
+.image-grid-viewport:active {
+  cursor: grabbing;
+}
+
+.image-grid-container {
+  display: block; 
+  position: relative; 
+}
+
+/* Image Tile Styles */
+.image-tile {
+  position: absolute;
+  border-radius: 8px; 
+  overflow: visible; /* Allow info below focused tile to be seen */
+  background-color: #fff; 
+  will-change: transform, opacity, left, top, width, height, z-index; 
+  cursor: pointer;
+  /* box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); Removed as per request */
+}
+
+.image-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover; 
+  user-select: none; 
+  pointer-events: none; 
+  border-radius: 8px; /* Ensure image itself has rounded corners if tile bg is transparent */
+}
+
+/* In-Tile Product Info (for NON-FOCUSED tiles) */
+.tile-product-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  padding: 10px 8px; 
+  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0) 100%);
+  color: white;
+  text-align: center;
+  opacity: 0; 
+  transform: translateY(10px); 
+  pointer-events: none; 
+  border-bottom-left-radius: 8px; 
+  border-bottom-right-radius: 8px;
+  font-family: var(--tag-filter-serif-font);
+}
+
+.tile-product-info h3 {
+  font-size: 0.8em; 
+  margin: 0 0 2px 0;
+  font-weight: 500; 
+  letter-spacing: 0.2px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.6); 
+}
+
+.tile-product-info .tile-product-price {
+  font-size: 0.65em; 
+  margin: 0;
+  font-weight: normal;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+}
+
+/* Focused Product Details Pane (Bottom Center) */
+.focused-product-details-pane {
+  position: fixed;
+  bottom: 20px; /* Adjust as needed */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--floating-z-index);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px; /* Space between info, CTA, and tags */
+  padding: 10px;
+  max-width: 90%;
+  pointer-events: auto; /* Allow interaction with this pane */
+}
+
+/* Styles for FloatingProductInfo when inside focused-product-details-pane */
+.focused-product-details-pane .floating-product-info {
+  position: static; /* Override fixed positioning */
+  transform: none; /* Override translateX */
+  background-color: transparent; /* Pane itself might have bg if needed */
+  backdrop-filter: none;
+  box-shadow: none;
+  padding: 0;
+  text-align: center; /* As per image */
+}
+
+.focused-product-details-pane .floating-product-info h3 {
+  font-family: "Times Now SemiLight", var(--tag-filter-serif-font);
+  font-size: 1.2em; /* Adjust to match image */
+  font-weight: 500; 
+  color: var(--focused-pane-text-main);
+  margin-bottom: 3px; 
+}
+
+.focused-product-details-pane .floating-product-info .price { /* For "Cashmere" or price */
+  font-family: var(--tag-filter-serif-font);
+  font-size: 0.9em; /* Adjust to match image */
+  color: var(--focused-pane-text-sub);
+}
+
+/* Styles for FloatingCTA when inside focused-product-details-pane */
+.focused-product-details-pane .floating-cta-container {
+  position: static; /* Override fixed positioning */
+  transform: none; /* Override translateX */
+}
+
+.focused-product-details-pane .find-similar-btn-floating {
+  background-color: var(--focused-pane-button-bg);
+  color: var(--focused-pane-button-text);
+  border: none;
+  padding: 10px 25px; /* Adjust for a more substantial, less wide button */
+  border-radius: 4px; /* More squared */
+  font-size: 0.9em; 
+  font-weight: 500;
+  font-family: "Optima LT Std", var(--tag-filter-serif-font);
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  /* box-shadow: 0 2px 5px rgba(0,0,0,0.1); Optional subtle shadow */
+}
+.focused-product-details-pane .find-similar-btn-floating:hover {
+  background-color: #7a5c42; 
+  transform: translateY(-1px);
+}
+
+/* Wrapper for TagFilters when inside focused-product-details-pane */
+.focused-pane-tags-wrapper {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap; /* Allow tags to wrap on smaller screens if necessary */
+}
+
+.focused-pane-tags-wrapper .tag-filter {
+  background-color: var(--lp-bg-color); /* Use app background for solid fill */
+  border: 1px solid var(--focused-pane-tag-border);
+  color: var(--focused-pane-tag-text);
+  font-family: var(--tag-filter-serif-font);
+  padding: 6px 12px; /* Slightly larger for clarity */
+  border-radius: 4px; /* More squared */
+  font-size: 13px;
+}
+.focused-pane-tags-wrapper .tag-filter:hover {
+  background-color: var(--focused-pane-tag-hover-bg);
+}
+.focused-pane-tags-wrapper .tag-filter-icon-pin,
+.focused-pane-tags-wrapper .tag-filter-icon-arrow {
+  stroke: var(--focused-pane-tag-text);
+}
+
+
+/* Top Navigation Buttons (Previous & Restart) */
+.floating-previous-btn-wrapper,
+.floating-restart-btn-wrapper,
+.floating-tags-bar { /* This is for the TOP tags bar if it exists */
+  position: fixed;
+  top: 20px;
+  z-index: var(--floating-z-index);
+  display: flex; 
+  align-items: center;
+}
+
+.floating-previous-btn-wrapper { left: 20px; }
+.floating-restart-btn-wrapper { right: 20px; }
+
+/* Top Tags Bar - distinct from focused-pane-tags-wrapper */
+.floating-tags-bar {
+  left: 50%;
+  transform: translateX(-50%);
+  gap: 8px; 
+  padding: 6px 10px; 
+  background-color: rgba(248, 245, 240, 0.7); /* Semi-transparent background */
+  backdrop-filter: blur(var(--floating-bg-blur));
+  -webkit-backdrop-filter: blur(var(--floating-bg-blur));
+  border-radius: 20px; 
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+/* Individual tags WITHIN the top floating-tags-bar */
+.floating-tags-bar .tag-filter {
+  background-color: transparent; /* Tags transparent within the bar */
+  border-radius: 16px; /* Pill-like */
+   /* Individual box shadow removed, bar has shadow */
+}
+
+
+.floating-nav-button { 
+  background-color: rgba(237, 234, 230, 0.8); /* Match --lp-grid-bg with alpha */
+  border: 1px solid var(--tag-filter-border-color);
+  color: var(--tag-filter-text-color);
+  font-family: var(--tag-filter-serif-font);
+  padding: 6px 12px;
+  border-radius: 16px; /* Pill shape, or make more square e.g. 4px if desired */
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  /* box-shadow: 0 1px 3px rgba(0,0,0,0.05); */ /* Optional subtle shadow */
+}
+.floating-nav-button:hover {
+  background-color: rgba(237, 234, 230, 1);
+  border-color: #ad9d8e; 
+  /* box-shadow: 0 2px 5px rgba(0,0,0,0.1); */
+}
+
+
+/* Original FloatingProductInfo (when not in focused pane) - hide if pane is shown */
+.floating-product-info-top { 
+  position: fixed;
+  bottom: 22%; 
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--floating-z-index);
+  text-align: center;
+  padding: 8px 16px; 
+  background-color: rgba(248, 245, 240, 0.7); 
+  backdrop-filter: blur(var(--floating-bg-blur));
+  -webkit-backdrop-filter: blur(var(--floating-bg-blur));
+  border-radius: 6px; 
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  pointer-events: none; 
+}
+.floating-product-info-top h3 {
+  font-size: 1.0em; 
+  font-weight: 500; 
+  color: var(--floating-text-color);
+  margin-bottom: 2px; 
+  letter-spacing: 0.5px;
+}
+.floating-product-info-top .price {
+  font-size: 0.8em; 
+  color: var(--floating-sub-text-color);
+}
+
+/* Original FloatingCTA (when not in focused pane) - hide if pane is shown */
+.floating-cta-container-top {
+  position: fixed;
+  bottom: 15%; 
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--floating-z-index);
+  text-align: center;
+}
+.floating-cta-container-top .find-similar-btn-floating {
+  background-color: var(--lp-primary-accent);
+  color: white;
+  border: none;
+  padding: 10px 20px; 
+  border-radius: 6px;
+  font-size: 0.9em; 
+  font-weight: 500;
+  font-family: "Optima LT Std", var(--tag-filter-serif-font);
+  cursor: pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+}
+
+
+/* Tag Filter Styles (General) */
+.tag-filter-wrapper { 
+  position: relative; 
+}
+
+/* Default Tag styling (used by top bar, overridden by focused pane wrapper) */
+.tag-filter {
+  display: inline-flex; 
+  align-items: center;
+  padding: 5px 10px; 
+  border: 1px solid var(--tag-filter-border-color); 
+  color: var(--tag-filter-text-color); 
+  font-family: var(--tag-filter-serif-font); 
+  font-size: 13px; 
+  font-weight: normal; 
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+  min-width: auto; 
+}
+.tag-filter:hover {
+  background-color: var(--tag-filter-hover-bg-color); 
+  border-color: #ad9d8e; 
+}
+
+.tag-filter-icon {
+  stroke: var(--tag-filter-icon-color);
+  flex-shrink: 0; 
+}
+.pin-icon-clickable-area {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-right: 4px; 
+}
+
+.tag-filter-icon-pin {
+  margin-right: 4px; 
+}
+.tag-filter-icon-pin.pinned {
+  fill: var(--tag-filter-pinned-color);
+  stroke: var(--tag-filter-pinned-color); 
+}
+
+.tag-filter-icon-arrow {
+  margin-left: 4px; 
+}
+
+.tag-filter-text {
+  flex-grow: 1; 
+  text-align: left; 
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px; 
+}
+
+.tag-filter-dropdown { 
+  position: absolute;
+  bottom: calc(100% + 4px); /* Changed to open upwards for bottom tags */
+  left: 50%; 
+  transform: translateX(-50%);
+  min-width: 150px; 
+  background-color: var(--tag-filter-bg-color);
+  border: 1px solid var(--tag-filter-border-color);
+  border-radius: 6px;
+  box-shadow: var(--tag-filter-dropdown-shadow);
+  z-index: 1001; 
+  list-style: none;
+  padding: 4px 0;
+  max-height: 160px; 
+  overflow-y: auto;
+}
+/* For top tags bar, dropdown opens downwards */
+.floating-tags-bar .tag-filter-dropdown {
+  top: calc(100% + 4px);
+  bottom: auto;
+}
+
+
+.tag-filter-dropdown-item {
+  padding: 5px 10px; 
+  font-family: var(--tag-filter-serif-font);
+  font-size: 12px; 
+  color: var(--tag-filter-text-color);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.tag-filter-dropdown-item:hover {
+  background-color: var(--tag-filter-hover-bg-color);
+}
+
+.tag-filter-dropdown-item.selected {
+  background-color: var(--lp-secondary-accent);
+  color: white;
+}
+
+
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .focused-product-details-pane .floating-product-info h3 { font-size: 1.1em; }
+  .focused-product-details-pane .floating-product-info .price { font-size: 0.8em; }
+  .focused-product-details-pane .find-similar-btn-floating { font-size: 0.85em; padding: 8px 20px; }
+  .focused-product-details-pane { bottom: 15px; gap: 10px; }
+  .focused-pane-tags-wrapper .tag-filter { font-size: 12px; padding: 5px 10px; }
+  
+  .floating-tags-bar { /* Top bar responsive */
+    max-width: calc(100vw - 180px); /* Adjusted for Previous/Restart buttons */
+    overflow-x: auto;
+    padding: 4px 8px;
+    gap: 6px;
+    -ms-overflow-style: none; 
+    scrollbar-width: none;  
+    left: 50%; /* Ensure it stays centered */
+    transform: translateX(-50%); /* Ensure it stays centered */
+  }
+  .floating-tags-bar::-webkit-scrollbar { display: none; }
+
+  .floating-previous-btn-wrapper, .floating-restart-btn-wrapper { top: 15px; }
+  .floating-previous-btn-wrapper { left: 15px; }
+  .floating-restart-btn-wrapper { right: 15px; }
+  .floating-nav-button { font-size: 12px; padding: 5px 10px; }
+
+  .floating-tags-bar .tag-filter { font-size: 12px; padding: 4px 8px; }
+  .tag-filter-text { max-width: 80px; }
+  .tag-filter-dropdown-item { font-size: 11px; }
+}
+
+@media (max-width: 480px) {
+  .focused-product-details-pane .floating-product-info h3 { font-size: 1em; }
+  .focused-product-details-pane .floating-product-info .price { font-size: 0.75em; }
+  .focused-product-details-pane .find-similar-btn-floating { font-size: 0.8em; padding: 7px 18px; }
+  .focused-product-details-pane { bottom: 10px; gap: 8px; }
+  .focused-pane-tags-wrapper .tag-filter { font-size: 11px; padding: 4px 8px; }
+  .focused-pane-tags-wrapper { gap: 6px; }
+  
+  .floating-tags-bar { /* Top bar responsive */
+    gap: 4px;
+    max-width: calc(100vw - 150px); /* Adjusted for Previous/Restart buttons */
+    padding: 3px 6px;
+  }
+  .floating-previous-btn-wrapper, .floating-restart-btn-wrapper { top: 10px; }
+  .floating-previous-btn-wrapper { left: 10px; }
+  .floating-restart-btn-wrapper { right: 10px; }
+  .floating-nav-button { font-size: 11px; padding: 4px 8px; }
+
+  .floating-tags-bar .tag-filter { font-size: 11px; padding: 3px 6px; }
+  .tag-filter-text { max-width: 60px; }
+}
+
+/* Ensure old product details bar is gone */
+.product-details-fixed-container { display: none !important; }
+.photo-sphere-app, .app-header, .main-content, .sidebar, .photoviz-container { display: none !important; }
