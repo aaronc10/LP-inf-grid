@@ -20,8 +20,8 @@ const getAllTagOptions = (products: Product[]): TagOptions => {
     if (p.tags) {
       (Object.keys(p.tags) as Array<keyof PinnedTags>).forEach(key => {
         const value = p.tags[key];
-        if (value && !options[key].includes(value)) {
-          options[key].push(value);
+        if (value && !(options[key] as string[]).includes(value)) {
+          (options[key] as string[]).push(value);
         }
       });
     }
@@ -187,11 +187,12 @@ export default function App() {
         isInteracting={isInteracting} // Pass state down
       />
 
-      {showBottomPane && (
+      {/* Always show the floating product info pane if there is a focused product */}
+      {focusedProduct && (
         <div className="focused-product-details-pane">
           <FloatingProductInfo 
             product={focusedProduct} 
-            isGridSettled={isGridSettled} 
+            isGridSettled={true} // Always show
           />
           <FloatingCTA 
             onFindSimilar={handleFindSimilar} 
@@ -199,16 +200,20 @@ export default function App() {
           />
           <div className="focused-pane-tags-wrapper">
             {tagCategories.map(({ key, displayName }) => {
-              const optionsForCategory = allTagOptions[key] || [];
-              if (optionsForCategory.length === 0 && !(focusedProduct?.tags?.[key]) && !pinnedTags[key]) return null;
+              const optionsForCategory = allTagOptions[key as keyof typeof allTagOptions] || [];
+              if (
+                (!Array.isArray(optionsForCategory) || (optionsForCategory as string[]).length === 0) &&
+                !(focusedProduct?.tags?.[key as keyof typeof focusedProduct.tags]) &&
+                !(pinnedTags[key as keyof typeof pinnedTags])
+              ) return null;
 
               return (
                 <TagFilter
                   key={key}
                   categoryKey={key}
                   categoryDisplayName={displayName}
-                  currentTagValue={focusedProduct?.tags?.[key] || null}
-                  pinnedValue={pinnedTags[key]}
+                  currentTagValue={focusedProduct?.tags?.[key as keyof typeof focusedProduct.tags] || null}
+                  pinnedValue={pinnedTags[key as keyof typeof pinnedTags]}
                   options={optionsForCategory}
                   onPinToggle={handlePinToggle} 
                   onSelectOption={handleSwapTag} 

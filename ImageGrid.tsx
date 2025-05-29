@@ -1,13 +1,14 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import gsap from 'gsap';
 import { InertiaPlugin } from 'gsap/InertiaPlugin';
+import type { Tween } from 'gsap';
 gsap.registerPlugin(InertiaPlugin);
 // import { motion, useMotionValue, animate, PanInfo } from 'framer-motion';
 import ImageTile from './ImageTile';
 import type { Product, StyleProps, VirtualCell, ImageGridProps } from './types';
 
-const MIN_SPACING_DESKTOP = 30; 
-const MAX_SPACING_DESKTOP = 70;
+const MIN_SPACING_DESKTOP = 50; 
+const MAX_SPACING_DESKTOP = 80;
 const MIN_SPACING_MOBILE = 15;
 const MAX_SPACING_MOBILE = 25;
 
@@ -64,6 +65,19 @@ const ImageGrid: React.FC<ImageGridProps> = ({
   // Add panX and panY refs for panning
   const panX = useRef(0);
   const panY = useRef(0);
+
+  // Add hovered tile vr/vc state
+  const [hoveredVr, setHoveredVr] = useState<number | null>(null);
+  const [hoveredVc, setHoveredVc] = useState<number | null>(null);
+
+  // Drag state for grid dragging
+  const dragStart = useRef<{ x: number; y: number; vr: number; vc: number } | null>(null);
+  const [draggedVr, setDraggedVr] = useState<number | null>(null);
+  const [draggedVc, setDraggedVc] = useState<number | null>(null);
+
+  // Helper to get the current vr/vc (dragged or focused)
+  const currentVr = draggedVr !== null ? draggedVr : focusedVr;
+  const currentVc = draggedVc !== null ? draggedVc : focusedVc;
 
   useEffect(() => {
     if (onIsSettledChange) {
@@ -237,24 +251,31 @@ const ImageGrid: React.FC<ImageGridProps> = ({
   }, [images, calculateLayoutConstants, centerOnVirtualCell]); 
   
   const onPointerDown = (e: React.PointerEvent) => {
+    if (currentVr === null || currentVc === null) return;
     isDragging.current = true;
-    lastPointer.current = { x: e.clientX, y: e.clientY };
-    lastMoveTime.current = Date.now();
-    velocity.current = { x: 0, y: 0 };
+    dragStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      vr: currentVr,
+      vc: currentVc,
+    };
     setIsUserInteractingOrSnappingLocal(true);
     if (onInteractingChange) onInteractingChange(true);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!isDragging.current) return;
-    const now = Date.now();
-    const dt = Math.max(1, now - lastMoveTime.current);
-    const dx = e.clientX - lastPointer.current.x;
-    const dy = e.clientY - lastPointer.current.y;
-    velocity.current = { x: dx / dt * 16, y: dy / dt * 16 }; // px per frame
-    lastPointer.current = { x: e.clientX, y: e.clientY };
-    lastMoveTime.current = now;
+    if (!isDragging.current || !dragStart.current) return;
+    const { x, y, vr, vc } = dragStart.current;
+    const dx = e.clientX - x;
+    const dy = e.clientY - y;
+    const { tileAndSpacingWidth, tileAndSpacingHeight } = layoutConfig;
+    if (!tileAndSpacingWidth || !tileAndSpacingHeight) return;
+    // Negative dx means drag right moves grid left (vc increases)
+    const deltaVc = -dx / tileAndSpacingWidth;
+    const deltaVr = -dy / tileAndSpacingHeight;
+    setDraggedVr(vr + deltaVr);
+    setDraggedVc(vc + deltaVc);
   };
 
   // Helper to track when both inertia animations are done
@@ -271,110 +292,95 @@ const ImageGrid: React.FC<ImageGridProps> = ({
     return Math.round(value / increment) * increment;
   }
 
-  // When focusedVr or focusedVc changes, pan to center the focused tile
+  // When focusedVr or focusedVc changes, pan to center the focused tile with GSAP elastic animation
   useEffect(() => {
     if (focusedVr === null || focusedVc === null || !layoutConfig.imageWidth || !layoutConfig.tileAndSpacingWidth) return;
-    if (!viewportRef.current) return;
+    if (!viewportRef.current || !gridRef.current) return;
+    if (draggedVr !== null || draggedVc !== null) return; // Don't animate during drag
     const { tileAndSpacingWidth, tileAndSpacingHeight, imageWidth, imageHeight } = layoutConfig;
-    const vpWidth = viewportRef.current.offsetWidth;
-    const vpHeight = viewportRef.current.offsetHeight;
     // Center of the focused tile in grid coordinates
     const tileCenterX = focusedVc * tileAndSpacingWidth + imageWidth / 2;
     const tileCenterY = focusedVr * tileAndSpacingHeight + imageHeight / 2;
     // Pan so that the grid's (0,0) is at the viewport center, and the focused tile is centered
     panX.current = -tileCenterX;
     panY.current = -tileCenterY;
-    // Update grid transform
-    if (gridRef.current) {
-      gridRef.current.style.transform = `translate3d(${panX.current}px, ${panY.current}px, 0)`;
-    }
-  }, [focusedVr, focusedVc, layoutConfig]);
+    // Animate grid transform with GSAP elastic
+    gsap.to(gridRef.current, {
+      x: panX.current,
+      y: panY.current,
+      duration: 1.1,
+      ease: "elastic.out(0.5, 0.5)",
+      overwrite: true,
+    });
+  }, [focusedVr, focusedVc, layoutConfig, draggedVr, draggedVc]);
 
-  // Debug popup for focused index
-    const debugPopupRef = useRef<HTMLDivElement | null>(null);
+  // // Debug popup for focused index
+  //   const debugPopupRef = useRef<HTMLDivElement | null>(null);
 
-    const DebugPopup = () => (
-      <div style={{
-        position: 'fixed',
-        top: 10,
-        right: 10,
-        background: 'rgba(0,0,0,0.7)',
-        color: 'white',
-        padding: '8px 12px',
-        borderRadius: 4,
-        fontSize: 14,
-        zIndex: 9999
-      }}>
-        Focused Index: {focusedVr}, {focusedVc}
-      </div>
-    );
+  //   const DebugPopup = () => (
+  //     <div style={{
+  //       position: 'fixed',
+  //       top: 10,
+  //       right: 10,
+  //       background: 'rgba(0,0,0,0.7)',
+  //       color: 'white',
+  //       padding: '8px 12px',
+  //       borderRadius: 4,
+  //       fontSize: 14,
+  //       zIndex: 9999,
+  //       pointerEvents: 'none',
+  //       userSelect: 'none',
+  //     }}>
+  //       Focused Index: {focusedVr}, {focusedVc}
+  //     </div>
+  //   );
 
   const getVisibleTiles = useCallback(() => {
     if (!viewportRef.current || !layoutConfig.imageWidth || layoutConfig.tileAndSpacingWidth === 0 || layoutConfig.tileAndSpacingHeight === 0 || images.length === 0) {
       return [];
     }
-    
     const vpElementWidth = viewportRef.current.offsetWidth;
     const vpElementHeight = viewportRef.current.offsetHeight; 
-    // No panX or panY, so just use 0 for currentPanX/currentPanY
-    const currentPanX = 0;
-    const currentPanY = 0;
     const { imageWidth, imageHeight, tileAndSpacingWidth, tileAndSpacingHeight, numColsEffective } = layoutConfig;
-
-    const bufferX = vpElementWidth * RENDER_BUFFER_FACTOR;
-    const bufferY = vpElementHeight * RENDER_BUFFER_FACTOR;
-
-    if (tileAndSpacingWidth <= 0 || tileAndSpacingHeight <= 0) return [];
-
-    const minVisibleVc = Math.floor((-currentPanX - bufferX) / tileAndSpacingWidth);
-    const maxVisibleVc = Math.ceil((-currentPanX + vpElementWidth + bufferX) / tileAndSpacingWidth);
-    const minVisibleVr = Math.floor((-currentPanY - bufferY) / tileAndSpacingHeight);
-    const maxVisibleVr = Math.ceil((-currentPanY + vpElementHeight + bufferY) / tileAndSpacingHeight);
-    
+    const centerVr = currentVr ?? 0;
+    const centerVc = currentVc ?? 0;
+    const tilesWide = Math.ceil(vpElementWidth / tileAndSpacingWidth) + 4;
+    const tilesHigh = Math.ceil(vpElementHeight / tileAndSpacingHeight) + 4;
+    const minVisibleVc = centerVc - Math.floor(tilesWide / 2);
+    const maxVisibleVc = centerVc + Math.floor(tilesWide / 2);
+    const minVisibleVr = centerVr - Math.floor(tilesHigh / 2);
+    const maxVisibleVr = centerVr + Math.floor(tilesHigh / 2);
     const visibleTiles: TileData[] = [];
-    // const newTilesMap = new Map<string, TileData>();
-
     for (let vr = minVisibleVr; vr <= maxVisibleVr; vr++) {
       for (let vc = minVisibleVc; vc <= maxVisibleVc; vc++) {
         const imageIndex = mapVirtualCellToImageIndex({vr, vc}, images, numColsEffective);
         const originalImage = images[imageIndex];
-        
-        if (!originalImage) continue; 
-        
+        if (!originalImage) continue;
         const uniqueId = `${originalImage.id}-${vr}-${vc}`;
-        // const isTileCurrentlyFocused = !isUserInteractingOrSnappingLocal && lastFocusedVirtualCellRef.current?.uniqueId === uniqueId;
-
         const tileX_final = vc * tileAndSpacingWidth;
         const tileY_final = vr * tileAndSpacingHeight;
-        
-        // Distance factor: Manhattan distance from focused tile
         let distanceFactor = 1;
-        if (focusedVr !== null && focusedVc !== null) {
-          const dVr = Math.abs(vr - focusedVr);
-          const dVc = Math.abs(vc - focusedVc);
-          distanceFactor = (dVr + dVc) / 6; // 6 is an arbitrary normalization factor, tweak as needed
+        if (currentVr !== null && currentVc !== null) {
+          const dVr = Math.abs(vr - currentVr);
+          const dVc = Math.abs(vc - currentVc);
+          distanceFactor = (dVr + dVc) / 6;
         }
-
         const tileData: TileData = {
           ...originalImage,
           uniqueId,
           vr,
           vc,
           styleProps: { left: tileX_final, top: tileY_final, width: imageWidth, height: imageHeight },
-          isFocused: false, // Only set by idx === focusedIdx
+          isFocused: false,
           distanceFactor,
           key: uniqueId,
           isInteracting,
         };
-
-        // newTilesMap.set(uniqueId, tileData);
         visibleTiles.push(tileData);
       }
     }
-
-    // tilesRef.current = newTilesMap;
     return visibleTiles;
-  }, [images, layoutConfig, isInteracting, focusedVr, focusedVc]);
+  }, [images, layoutConfig, isInteracting, currentVr, currentVc]);
 
   const tilesToRender = getVisibleTiles();
 
@@ -433,8 +439,18 @@ const ImageGrid: React.FC<ImageGridProps> = ({
   const onPointerUp = (e: React.PointerEvent) => {
     if (!isDragging.current) return;
     isDragging.current = false;
-    // Snap to grid after drag, no inertia
-    // animateSnapPanToGrid();
+    setIsUserInteractingOrSnappingLocal(false);
+    if (onInteractingChange) onInteractingChange(false);
+    if (draggedVr !== null && draggedVc !== null) {
+      // Snap to nearest integer
+      const snappedVr = Math.round(draggedVr);
+      const snappedVc = Math.round(draggedVc);
+      setFocusedVr(snappedVr);
+      setFocusedVc(snappedVc);
+    }
+    setDraggedVr(null);
+    setDraggedVc(null);
+    dragStart.current = null;
   };
 
   useEffect(() => {
@@ -443,6 +459,72 @@ const ImageGrid: React.FC<ImageGridProps> = ({
       image.src = img.src;
     });
   }, [images]);
+
+  // Keep floating product info in sync with focused tile
+  useEffect(() => {
+    if (focusedVr !== null && focusedVc !== null) {
+      const focusedTile = tilesToRender.find(t => t.vr === focusedVr && t.vc === focusedVc);
+      if (focusedTile && onFocusedProductChange) {
+        onFocusedProductChange(focusedTile);
+      }
+    }
+  }, [focusedVr, focusedVc, tilesToRender, onFocusedProductChange]);
+
+  // Add mouse wheel support for elastic snapping with GSAP inertia
+  useEffect(() => {
+    let virtualVr = focusedVr ?? 0;
+    let virtualVc = focusedVc ?? 0;
+    let gsapTweenVr: Tween | null = null;
+    let gsapTweenVc: Tween | null = null;
+    const SCROLL_SENSITIVITY = 0.001; // Lower = more resistance
+    const handleWheel = (e: WheelEvent) => {
+      if (focusedVr === null || focusedVc === null) return;
+      // Determine scroll direction and accumulate
+      let deltaVr = 0;
+      let deltaVc = 0;
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        deltaVr = e.deltaY * SCROLL_SENSITIVITY;
+      } else {
+        deltaVc = e.deltaX * SCROLL_SENSITIVITY;
+      }
+      virtualVr += deltaVr;
+      virtualVc += deltaVc;
+      // Kill any existing tweens
+      if (gsapTweenVr) gsapTweenVr.kill();
+      if (gsapTweenVc) gsapTweenVc.kill();
+      // Animate virtualVr and virtualVc with inertia, then snap
+      gsapTweenVr = gsap.to({ v: virtualVr }, {
+        v: Math.round(virtualVr),
+        duration: 0.7,
+        ease: "power3.out",
+        onUpdate: function() {
+          setFocusedVr(Math.round(this.targets()[0].v));
+        },
+        onComplete: function() {
+          virtualVr = Math.round(virtualVr);
+        }
+      });
+      gsapTweenVc = gsap.to({ v: virtualVc }, {
+        v: Math.round(virtualVc),
+        duration: 0.7,
+        ease: "power3.out",
+        onUpdate: function() {
+          setFocusedVc(Math.round(this.targets()[0].v));
+        },
+        onComplete: function() {
+          virtualVc = Math.round(virtualVc);
+        }
+      });
+      e.preventDefault();
+    };
+    const vp = viewportRef.current;
+    if (vp) vp.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      if (vp) vp.removeEventListener('wheel', handleWheel);
+      if (gsapTweenVr) gsapTweenVr.kill();
+      if (gsapTweenVc) gsapTweenVc.kill();
+    };
+  }, [focusedVr, focusedVc]);
 
   if (images.length === 0 && !isUserInteractingOrSnappingLocal) {
     return <div ref={viewportRef} className="image-grid-viewport loading-placeholder">No matching products. Try adjusting filters.</div>;
@@ -460,24 +542,32 @@ const ImageGrid: React.FC<ImageGridProps> = ({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      style={{ touchAction: 'none', width: '100%', height: '100%' }}
+      style={{ touchAction: 'none', width: '100%', height: '100%', cursor: 'grab' }}
     >
       <div
         ref={gridRef}
         className="image-grid-container"
         // transform is now set by useEffect
       >
-        <DebugPopup />
         {tilesToRender.map((tile, idx) => (
           <ImageTile
             key={tile.key}
             image={tile as Product & { uniqueId: string }}
             styleProps={tile.styleProps}
-            isFocused={tile.vr === focusedVr && tile.vc === focusedVc}
+            isFocused={tile.vr === currentVr && tile.vc === currentVc}
+            isHovered={tile.vr === hoveredVr && tile.vc === hoveredVc}
             distanceFactor={tile.distanceFactor}
-            onClick={() => onProductImageClick(tile)}
+            onClick={() => {
+              setFocusedVr(tile.vr);
+              setFocusedVc(tile.vc);
+              onProductImageClick(tile);
+            }}
             isInteracting={tile.isInteracting}
             tileIndex={idx}
+            onHover={(vr, vc) => {
+              setHoveredVr(vr);
+              setHoveredVc(vc);
+            }}
           />
         ))}
       </div>
