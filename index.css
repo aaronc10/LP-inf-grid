@@ -188,7 +188,7 @@ body {
   align-items: center;
   gap: 12px; /* Space between info, CTA, and tags */
   padding: 10px;
-  max-width: 90%;
+  //max-width: 90%;
   pointer-events: auto; /* Allow interaction with this pane */
 }
 
@@ -448,6 +448,7 @@ body {
 .floating-tags-bar .tag-filter-dropdown {
   top: calc(100% + 4px);
   bottom: auto;
+  
 }
 
 
@@ -506,7 +507,11 @@ body {
   .focused-product-details-pane .floating-product-info .price { font-size: 0.75em; }
   .focused-product-details-pane .find-similar-btn-floating { font-size: 0.8em; padding: 7px 18px; }
   .focused-product-details-pane { bottom: 10px; gap: 8px; }
-  .focused-pane-tags-wrapper .tag-filter { font-size: 11px; padding: 4px 8px; }
+  .focused-pane-tags-wrapper .tag-filter { font-size: 11px; padding: 4px 8px; display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 4px; }
   .focused-pane-tags-wrapper { gap: 6px; }
   
   .floating-tags-bar { /* Top bar responsive */

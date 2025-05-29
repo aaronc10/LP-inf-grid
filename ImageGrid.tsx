@@ -9,8 +9,8 @@ import type { Product, StyleProps, VirtualCell, ImageGridProps } from './types';
 
 const MIN_SPACING_DESKTOP = 50; 
 const MAX_SPACING_DESKTOP = 80;
-const MIN_SPACING_MOBILE = 15;
-const MAX_SPACING_MOBILE = 25;
+const MIN_SPACING_MOBILE = 30;
+const MAX_SPACING_MOBILE = 50;
 
 const BASE_ASPECT_RATIO = 3 / 4; 
 const RENDER_BUFFER_FACTOR = 0.8; 
@@ -121,8 +121,8 @@ const ImageGrid: React.FC<ImageGridProps> = ({
     let numCols = targetCols;
     let currentSpacing = isMobile ? MIN_SPACING_MOBILE : MIN_SPACING_DESKTOP;
 
-    const minImageWidthMobile = 60; 
-    const maxImageWidthMobile = 100; 
+    const minImageWidthMobile = 120; 
+    const maxImageWidthMobile = 250; 
     const minImageWidthDesktop = 120;
     const maxImageWidthDesktop = 250;
 

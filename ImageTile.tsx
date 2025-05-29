@@ -138,7 +138,7 @@ const ImageTile: React.FC<ImageTileProps> = ({ image, styleProps, isFocused, isH
           padding: '2px 6px',
           borderRadius: '6px',
           zIndex: 100,
-          opacity: 0.5,
+          opacity: 0.0,
           fontFamily: 'var(--tag-filter-serif-font)'
         }}>
           {name}<br />vr:{vr} vc:{vc}
