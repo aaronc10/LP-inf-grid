@@ -9,10 +9,11 @@ interface ImageTileProps {
   distanceFactor: number;
   onClick: (product: Product) => void;
   isInteracting: boolean;
+  tileIndex?: number;
 }
 
-const ImageTile: React.FC<ImageTileProps> = ({ image, styleProps, isFocused, distanceFactor, onClick, isInteracting }) => {
-  const { uniqueId, id, src, alt, name, price } = image;
+const ImageTile: React.FC<ImageTileProps> = ({ image, styleProps, isFocused, distanceFactor, onClick, isInteracting, tileIndex }) => {
+  const { uniqueId, id, src, alt, name, price, vr, vc } = image as any;
 
   const style = {
     left: `${styleProps.left}px`,
@@ -23,7 +24,7 @@ const ImageTile: React.FC<ImageTileProps> = ({ image, styleProps, isFocused, dis
     zIndex: isFocused ? 20 : undefined,
   };
 
-  const falloffScale = 1 - (distanceFactor * 0.45); // Increased multiplier for more space
+  const falloffScale = 1 - (distanceFactor * 0.9); // Increased multiplier for more space
   const falloffOpacity = 1 - (distanceFactor * 0.4);
 
   const tileVariants = {
@@ -56,7 +57,7 @@ const ImageTile: React.FC<ImageTileProps> = ({ image, styleProps, isFocused, dis
   return (
     <motion.div
       id={`tile-${uniqueId || id}`} 
-      className="image-tile" 
+      className={`image-tile${isFocused ? ' focused-indicator' : ''}`}
       style={style} 
       variants={tileVariants}
       animate={isFocused ? "focused" : "normal"}
@@ -67,6 +68,21 @@ const ImageTile: React.FC<ImageTileProps> = ({ image, styleProps, isFocused, dis
       tabIndex={0} 
       onKeyPress={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(image); }} 
     >
+      {typeof tileIndex === 'number' && (
+        <div style={{
+          position: 'absolute',
+          top: 4,
+          right: 8,
+          background: 'rgba(0,0,0,0.7)',
+          color: 'white',
+          fontSize: '0.8em',
+          padding: '2px 6px',
+          borderRadius: '6px',
+          zIndex: 100
+        }}>
+          #{tileIndex}<br />vr:{vr} vc:{vc}<br />d:{distanceFactor.toFixed(2)}
+        </div>
+      )}
       <img src={src} alt={alt || name} draggable="false" />
       
       {!isFocused && ( // Render in-tile info only if NOT focused AND NOT INTERACTING
